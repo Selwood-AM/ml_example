@@ -9,6 +9,7 @@ from data_providers.fred_provider import FredProvider
 from data_providers.sec_provider import SecProvider
 from models.dcf import DCFInputs, DCFModel
 from reporting.excel_report import ExcelReportBuilder
+from reporting.template_report import TemplateExcelReportBuilder
 
 
 @dataclass
@@ -27,6 +28,10 @@ class RunConfig:
     terminal_growth_rate: float = 0.02
     output_dir: str = "./reports"
     data_source: str = "yahoo"  # yahoo | sec
+    template_path: Optional[str] = None
+    template_anchor: str = "DCF_Start"
+    template_sheet_fallback: Optional[str] = None
+    template_cell_fallback: Optional[str] = None
 
 
 class AnalystAgent:
@@ -105,13 +110,28 @@ class AnalystAgent:
             "Shares Outstanding": inputs.shares_outstanding,
         }
         out_path = os.path.join(cfg.output_dir, f"{cfg.ticker.upper()}_DCF.xlsx")
-        report = ExcelReportBuilder(out_path)
-        return report.build(
-            assumptions=assumptions,
-            fcfs=outputs.projected_fcfs,
-            pvs=outputs.present_values,
-            tv=outputs.terminal_value,
-            tv_pv=outputs.terminal_value_pv,
-            ev=outputs.enterprise_value,
-            per_share=outputs.intrinsic_value_per_share,
-        )
+        if cfg.template_path:
+            report = TemplateExcelReportBuilder(cfg.template_path, out_path)
+            return report.build(
+                assumptions=assumptions,
+                fcfs=outputs.projected_fcfs,
+                pvs=outputs.present_values,
+                tv=outputs.terminal_value,
+                tv_pv=outputs.terminal_value_pv,
+                ev=outputs.enterprise_value,
+                per_share=outputs.intrinsic_value_per_share,
+                dcf_anchor_name=cfg.template_anchor,
+                dcf_sheet_fallback=cfg.template_sheet_fallback,
+                dcf_cell_fallback=cfg.template_cell_fallback,
+            )
+        else:
+            report = ExcelReportBuilder(out_path)
+            return report.build(
+                assumptions=assumptions,
+                fcfs=outputs.projected_fcfs,
+                pvs=outputs.present_values,
+                tv=outputs.terminal_value,
+                tv_pv=outputs.terminal_value_pv,
+                ev=outputs.enterprise_value,
+                per_share=outputs.intrinsic_value_per_share,
+            )

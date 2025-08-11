@@ -21,6 +21,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--terminal_g", type=float, default=0.02)
     p.add_argument("--out", type=str, default="./reports")
     p.add_argument("--data_source", type=str, default="yahoo", choices=["yahoo", "sec"], help="Prefer data from 'yahoo' or 'sec'")
+    # Template options
+    p.add_argument("--template", type=str, help="Path to an Excel template (.xlsx)")
+    p.add_argument("--template_anchor", type=str, default="DCF_Start", help="Named range used as DCF table start")
+    p.add_argument("--template_sheet_fallback", type=str, help="Sheet name fallback if anchor missing")
+    p.add_argument("--template_cell_fallback", type=str, help="Cell like A1 where to place DCF table if anchor missing")
     return p.parse_args()
 
 
@@ -42,6 +47,10 @@ def main() -> None:
         terminal_growth_rate=args.terminal_g,
         output_dir=args.out,
         data_source=args.data_source,
+        template_path=args.template,
+        template_anchor=args.template_anchor,
+        template_sheet_fallback=args.template_sheet_fallback,
+        template_cell_fallback=args.template_cell_fallback,
     )
     path = agent.run(cfg)
     print(f"Report generated: {path}")
