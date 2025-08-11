@@ -6,6 +6,7 @@ import os
 
 from data_providers.yahoo_provider import YahooProvider
 from data_providers.fred_provider import FredProvider
+from data_providers.sec_provider import SecProvider
 from models.dcf import DCFInputs, DCFModel
 from reporting.excel_report import ExcelReportBuilder
 
@@ -25,12 +26,14 @@ class RunConfig:
     beta_override: Optional[float] = None
     terminal_growth_rate: float = 0.02
     output_dir: str = "./reports"
+    data_source: str = "yahoo"  # yahoo | sec
 
 
 class AnalystAgent:
     def __init__(self) -> None:
         self.yahoo = YahooProvider()
         self.fred = FredProvider()
+        self.sec = SecProvider()
 
     def infer_discount_rate(self, ticker: str, rf_series: Optional[str], erp: Optional[float], beta_override: Optional[float]) -> float:
         rf = 0.04
@@ -44,11 +47,35 @@ class AnalystAgent:
         beta = beta_override if beta_override is not None else (snapshot.beta or 1.0)
         return max(0.0, rf + beta * erp_value)
 
+    def _get_official_data(self, ticker: str) -> tuple[Optional[float], Optional[float]]:
+        cik = self.sec.get_cik_for_ticker(ticker)
+        if not cik:
+            return None, None
+        fcf = self.sec.get_latest_fcf(cik)
+        shares = self.sec.get_shares_outstanding(cik)
+        return fcf, shares
+
     def run(self, cfg: RunConfig) -> str:
         os.makedirs(cfg.output_dir, exist_ok=True)
+
+        starting_fcf: Optional[float] = None
+        shares_outstanding: Optional[float] = None
+
+        if cfg.data_source.lower() == "sec":
+            fcf_official, shares_official = self._get_official_data(cfg.ticker)
+            starting_fcf = fcf_official
+            shares_outstanding = shares_official
+
+        # Fallback to Yahoo if any piece missing
         snap = self.yahoo.get_snapshot(cfg.ticker)
-        starting_fcf = self.yahoo.get_trailing_fcf(cfg.ticker) or 1e9
-        discount_rate = cfg.discount_rate or self.infer_discount_rate(cfg.ticker, cfg.risk_free_series, cfg.equity_risk_premium, cfg.beta_override)
+        if shares_outstanding is None:
+            shares_outstanding = snap.shares_outstanding
+        if starting_fcf is None:
+            starting_fcf = self.yahoo.get_trailing_fcf(cfg.ticker) or 1e9
+
+        discount_rate = cfg.discount_rate or self.infer_discount_rate(
+            cfg.ticker, cfg.risk_free_series, cfg.equity_risk_premium, cfg.beta_override
+        )
         inputs = DCFInputs(
             ticker=cfg.ticker,
             starting_fcf=starting_fcf,
@@ -60,11 +87,12 @@ class AnalystAgent:
             tax_rate=cfg.tax_rate,
             discount_rate=discount_rate,
             terminal_growth_rate=cfg.terminal_growth_rate,
-            shares_outstanding=snap.shares_outstanding,
+            shares_outstanding=shares_outstanding,
         )
         outputs = DCFModel.run(inputs)
         assumptions = {
             "Ticker": cfg.ticker,
+            "Data Source": cfg.data_source,
             "Starting FCF": inputs.starting_fcf,
             "Forecast Years": inputs.forecast_years,
             "Revenue Growth": inputs.revenue_growth_rate,

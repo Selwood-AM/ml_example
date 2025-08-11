@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--beta", type=float)
     p.add_argument("--terminal_g", type=float, default=0.02)
     p.add_argument("--out", type=str, default="./reports")
+    p.add_argument("--data_source", type=str, default="yahoo", choices=["yahoo", "sec"], help="Prefer data from 'yahoo' or 'sec'")
     return p.parse_args()
 
 
@@ -40,6 +41,7 @@ def main() -> None:
         beta_override=args.beta,
         terminal_growth_rate=args.terminal_g,
         output_dir=args.out,
+        data_source=args.data_source,
     )
     path = agent.run(cfg)
     print(f"Report generated: {path}")
