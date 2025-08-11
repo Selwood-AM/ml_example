@@ -42,7 +42,7 @@ class AnalystAgent:
         erp_value = erp if erp is not None else 0.045
         snapshot = self.yahoo.get_snapshot(ticker)
         beta = beta_override if beta_override is not None else (snapshot.beta or 1.0)
-        return rf + beta * erp_value
+        return max(0.0, rf + beta * erp_value)
 
     def run(self, cfg: RunConfig) -> str:
         os.makedirs(cfg.output_dir, exist_ok=True)

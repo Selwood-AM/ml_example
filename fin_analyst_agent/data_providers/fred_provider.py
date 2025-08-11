@@ -24,21 +24,26 @@ class FredProvider:
         params = {
             "series_id": series_id,
             "file_type": "json",
+            # Consider setting observation_start to limit payload if desired
         }
         if self.api_key:
             params["api_key"] = self.api_key
-        resp = requests.get(FRED_BASE, params=params, timeout=20)
-        resp.raise_for_status()
-        data = resp.json()
-        observations = data.get("observations", [])
-        latest_value = None
-        latest_date = None
-        if observations:
-            last = observations[-1]
-            val = last.get("value")
-            try:
-                latest_value = float(val)
-            except Exception:
-                latest_value = None
-            latest_date = last.get("date")
-        return FredSeries(series_id=series_id, latest_value=latest_value, latest_date=latest_date)
+        try:
+            resp = requests.get(FRED_BASE, params=params, timeout=20)
+            if resp.status_code != 200:
+                return FredSeries(series_id=series_id, latest_value=None, latest_date=None)
+            data = resp.json()
+            observations = data.get("observations", [])
+            latest_value = None
+            latest_date = None
+            if observations:
+                last = observations[-1]
+                val = last.get("value")
+                try:
+                    latest_value = float(val)
+                except Exception:
+                    latest_value = None
+                latest_date = last.get("date")
+            return FredSeries(series_id=series_id, latest_value=latest_value, latest_date=latest_date)
+        except requests.RequestException:
+            return FredSeries(series_id=series_id, latest_value=None, latest_date=None)
